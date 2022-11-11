@@ -1,6 +1,6 @@
 # Yatter (yatter)
 
-A simple twitter clone app based on Quasar Framework and Vue 3
+A simple (*yet another*) twitter clone app based on Quasar Framework and Vue 3
 
 ![alt text](screenshot.png "Title")
 
