@@ -39,7 +39,7 @@
         enter-active-class="animated fadeIn slow"
         leave-active-class="animated fadeOut slow"
       >
-        <q-item class="q-py-md" v-for="yat in yats" :key="yat.date">
+        <q-item class="q-py-md" v-for="yat in yats" :key="yat.id">
         <q-item-section avatar top>
           <q-avatar>
             <img src="https://s.gravatar.com/avatar/85ee0da154b77f7af13881177b6b40a5?s=80">
@@ -73,10 +73,11 @@
               size="sm"
             />
             <q-btn
+              @click="likeYat(yat)"
               flat
               round
-              color="grey"
-              icon="far fa-heart"
+              :color="yat.liked ? 'pink' : 'grey'"
+              :icon="yat.liked ?  'fas fa-heart' : 'far fa-heart'"
               size="sm"
             />
             <q-btn
@@ -98,46 +99,63 @@
 <script>
 import { defineComponent } from 'vue'
 import { formatDistance } from "date-fns";
-
+import { collection, query, orderBy, onSnapshot, addDoc, deleteDoc, updateDoc, doc } from "firebase/firestore";
+import db from 'src/boot/firebase';
 
 export default defineComponent({
   name: 'PageHome',
   data() {
     return {
       newYatText: '',
-      yats: [
-        {
-          content: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Phasellus vel faucibus urna. Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas. Phasellus sodales mi eu lectus eleifend elementum. Cras pretium nisi arcu, et finibus augue posuere.',
-          date: 1668134100395
-        },
-        {
-          content: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Phasellus vel faucibus urna. Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas. Phasellus sodales mi eu lectus eleifend elementum. Cras pretium nisi arcu, et finibus augue posuere.',
-          date: 1668134361348
-        },
-        {
-          content: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Phasellus vel faucibus urna. Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas. Phasellus sodales mi eu lectus eleifend elementum. Cras pretium nisi arcu, et finibus augue posuere.',
-          date: 1668134365706
-        }
-      ]
+      yats: []
     };
   },
   methods: {
-    addNewYat() {
+    async likeYat(yat) {
+      yat.liked = !yat.liked;
+      await updateDoc(doc(db, 'yats', yat.id), yat);
+    },
+    async addNewYat() {
       let newYat = {
         content: this.newYatText,
-        date: Date.now()
+        date: Date.now(),
+        liked: false
       };
-      this.yats.unshift(newYat);
+
+      // Add a new document with a generated id.
+      await addDoc(collection(db, "yats"), newYat);
+
       this.newYatText = '';
     },
-    deleteYat(yat) {
-      let dateToDelete = yat.date;
-      let index = this.yats.findIndex(yat => yat.date === dateToDelete);
-      this.yats.splice(index, 1);
+    async deleteYat(yat) {
+      await deleteDoc(doc(db, "yats", yat.id));
     },
     relativeDate(value) {
       return formatDistance(value, new Date());
     }
+  },
+  mounted() {
+    const q = query(collection(db, "yats"), orderBy("date", "asc"));
+    onSnapshot(q, (snapshot) => {
+      snapshot.docChanges().forEach((change) => {
+        let yatChange = change.doc.data();
+        yatChange.id = change.doc.id;
+        if (change.type === "added") {
+          // console.log("New yat: ", change.doc.data());
+          this.yats.unshift(yatChange);
+        }
+        if (change.type === "modified") {
+          // console.log("Modified yat: ", change.doc.data());
+          const index = this.yats.findIndex(yat => yat.id == change.doc.id);
+          Object.assign(this.yats[index], yatChange);
+        }
+        if (change.type === "removed") {
+          // console.log("Removed yat: ", change.doc.data());
+          const index = this.yats.findIndex(yat => yat.id == change.doc.id);
+          this.yats.splice(index, 1);
+        }
+      });
+    });
   }
 })
 </script>
